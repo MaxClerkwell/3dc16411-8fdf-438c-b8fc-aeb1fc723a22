@@ -1,27 +1,144 @@
 \documentclass{dcbl/challenge}
 
-\setdoctitle{Der Titel meines Dokuments}
+\setdoctitle{Basic Assembler}
 \setdocauthor{Stephan Bökelmann}
 \setdocemail{sboekelmann@ep1.rub.de}
 \setdocinstitute{AG Physik der Hadronen und Kerne}
+\usepackage{listings}
 
 
 \begin{document}
 
-Jedes Challenge-Blatt beginnt mit einer kurzen Einleitung, die einen Kontext für den jeweiligen Zettel setzt. 
+Running shell-scripts will only get us so far.
+To run more advanced programs, we often need more control over the machine itself. 
+Especially when it comes to accessing memory directly, running a lot of operations, working with large data-sets or interacting with hardware.
+For these purposes, we don't want the shell interpreter to always read the next line of written code, interprete it and execute it.
+We would like to give the operating system a comprehensive list of commands to execute without relying on the shell.
+These programs are not stored in human readable files, but in binary-code, that can be executed directly by the operating system.
+Back in the days when Steve Wozniak wrote the operating system for the apple I, all he could do was write down, what the computer should do, translate it into memory addresses and op-codes on a piece of paper, and then program the bits manually onto a storage-device.
+We will use a more sophisticated method called Assembly, which is a formalized way of writing addresses and op-codes in the form of so called mnemonics. 
+These mnemonics are more readable than binary, and can be translated into binary code by a text-processing tool like \texttt{as}.
 
-\section*{Aufgaben}
+\section*{Exercises}
 \begin{aufgabe}
-    Löse die Gleichung $x^2 - 5x + 6 = 0$.
+    Install the \texttt{binutil}-toolset by running \texttt{sudo apt update} and \texttt{sudo apt install binutils}.
+    This will install not only the \texttt{as} tool, but a variety of other tools as well.
 \end{aufgabe}
 
-\begin{aufgabe}[Für Fortgeschrittene]
-    Beweise den Satz des Pythagoras.
+\begin{aufgabe}
+    Navigate to your home directory with \texttt{cd } and create a new directory called \texttt{asm-workshop}.
+    Move into it and create your first assembly-file called \texttt{return42.s}.
+    Open the file in \texttt{vim} and write the following code:
+    \begin{lstlisting}[language={[x86masm]Assembler}, caption={Return 42 to the shell}]
+        .section .text
+        .global _start
+        
+        _start:
+            mov $42, %rdi  
+            mov $60, %rax    
+            syscall
+    \end{lstlisting}
+    Save and close the file.
+    This is your first assembly-program. 
+    It introduces a section of code to the \texttt{as}-processing tool called \texttt{.text}.
+    This is the standard lable for the section, which contains the executable code.
+    The next line introduces a global symbol for a function called \texttt{\_start}, which is visible after the translation for linking.
+    Compilation from text to binary-file is done in two steps:
+    \begin{enumerate}
+        \item The \texttt{as}-tool translates the code into binary-code.
+        \item The \texttt{ld}-tool links the binary-code into an executable-file.
+    \end{enumerate}
+    The second step is used to link multiple files together to create an executable-file.
+    In our case, this seems to make no sense, but we have to understand, that our executable-file needs a couple of functions from the actual operating system to be copied into the RAM correctly. 
+    Let's compile the textfile to an object-file first by running \texttt{as return42.s -o return42.o}.
+    After the object-file is created, we can inspect the binary code by running \texttt{xxd return42.o}.
+    Actually, this output is not that helpful unless you really want to become a binary expert, so let's look at something different here: \texttt{objdump -D return42.o}.
+    This is a slightly more readable version of the output of \texttt{xxd}.
+    Just understand, that the output seen here is not the actual content of the file, but it is parsed and formatted by the tool to make it easier to read.
+    The actual content is shown by \texttt{xxd}, even though it also adds some formating, such as memory-addresses on the left and decoding on the right side of the output.\\
+    We can use this object-file to create an executable file for our platform by running \texttt{ld -o return42 return42.o}.
+    Inspect the output file again, using \texttt{objdump -D return42}.
+    What do you see? 
+    In order to accentuate the differneces, redirect the output of \texttt{objdump -D -s -t -x return42.o} to a file called \texttt{return42object.dump} as well as \texttt{objdump -D -s -t -x return42} to a file called \texttt{return42.dump}.
+    Use \texttt{vimdiff} to see the differences in the two files.
+    The linker added some code in order to transform it from a single function to a complete executable file.\\
 \end{aufgabe}
+
+\begin{aufgabe}
+    Run the executable-file and observe the output of the shell.
+    There should be none. 
+    This is because the only output our executable-file should produce is the number 42 as a return-value to the shell that called the program.
+    Make sure, you understand the idea of what a mathematical function is.
+    A function or \textit{subroutine} run on a computer is to be seen as a mathematical function in the first place, executing a statement. 
+    Looking at the code of our assembly-program again, we can see, that only three instructions are executed. 
+    \begin{enumerate}
+        \item \texttt{mov \$42, \%rdi} - this moves the value 42 into the register with the name \texttt{\%edi}.
+        \item \texttt{mov \$60, \%rax} - this moves the value 60 into the register with the name \texttt{\%eax}.
+        \item \texttt{syscall} - this calls the operating system to do something.
+    \end{enumerate}
+    This \textbf{something} that the operating system should be doing is defined in the manual-pages of the operating system. 
+    When \texttt{syscall} is executed, the operating system will get the information what it should do from the registers \texttt{\%rdi}, \texttt{\%rsi}, \texttt{\%rdx} and \texttt{\%rcx} and then execute it.
+    In our case, we just want to return a value to our caller via a so called \textit{exit-status code}.
+    To explain that to the OS, we use the function with the number \texttt{60}, using the parameter \texttt{42}.
+    \texttt{\%rax} is the function, \texttt{\%rdi} is the parameter.
+\end{aufgabe}
+
+\begin{aufgabe}
+    The number returned by a program is caught by the shell and stored in a variable. 
+    You can use the command \texttt{echo \$?} to see the exit-status code of the last program, that was executed.
+    Typically, the exit-status code is used to decide, if the program has been executed successfully or not.
+    We were just fooling around with our 42 here, but this mechanic is typically not used like this.
+\end{aufgabe}
+
+\begin{aufgabe}
+    More often, we want to use the console, to write something to the screen.
+    Here is a brief assembler-programm to do that:
+    \begin{lstlisting}[language={[x86masm]Assembler}, caption={Write "hello" into the console}]
+        .section .data
+        helloMessage:
+            .string "hello\n"
+        
+        .section .text
+        .global _start
+        
+        _start:
+            # write syscall
+            mov $1, %rdi                
+            mov $helloMessage, %rsi     
+            mov $6, %rdx               
+            mov $1, %rax                
+            syscall                     
+        
+            # exit syscall
+            mov $60, %rax               
+            xor %rdi, %rdi              
+            syscall                     
+    \end{lstlisting}
+    Let's walk through this piece of code before we compile it. 
+    The binary file will have to memory-sections. 
+    One called \texttt{.data} and one called \texttt{.text}.
+    The \texttt{.data} section contains the string \texttt{hello} and the \texttt{.text} section contains the actual code.
+    The code consists of two sets of instructions. 
+    The first one is the systemcall in \texttt{\%rax} with the number \texttt{1}. 
+    This systemcall will write the amount of bytes written in \texttt{\%rdx} to the channel defined by \texttt{\%rdi}, starting from the address that is given by \texttt{\%rsi}.
+    \texttt{\%rdx} is six: one byte for each character plus the control-character \texttt{\textbackslash n} which will end the line.
+    \texttt{\%rsi} is the address of the string.
+    We defined a lable for that with the name \texttt{helloMessage} in our \texttt{.data}-section.
+    \texttt{\%rdi} is 1, which represents the standard output channel, in case of our operating system the text-console.\\
+    The second instruction is the exit-systemcall. 
+    As in the first example, it is called by using the function number \texttt{60}.
+    This time we don't write a number explicitly into the \texttt{\%rdi} register, because we don't need it.
+    Instead we use a \texttt{xor}-operation to generate a zero in \texttt{\%rdi}.
+    We could have moved a number into it instead, but this is a more efficient and idiomatic way to generate a zero.
+    The exit-status code zero signals to the shell, that everything went correctly.
+    Compile the program as before and inspect it using \texttt{objdump}.
+\end{aufgabe}
+
+
 
 \section*{Anmerkungen}
 \begin{enumerate}
-    \item Link zu einem YouTube-Video: \url{https://www.youtube.com}
+    \item Interfacing with Linux: \url{https://en.wikibooks.org/wiki/X86_Assembly/Interfacing_with_Linux}
 \end{enumerate}
 
 \end{document}
